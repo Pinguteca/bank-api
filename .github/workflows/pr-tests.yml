@@ -12,7 +12,6 @@ on:
 env:
   TUNIT_GITHUB_REPORTER_STYLE: collapsible
   PROJECT_NAME: BankApi.Service.Stable
-  PROJECT_PATH: BankApi.Service.Stable/BankApi.Service.Stable.csproj
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -51,8 +50,8 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
-          sparse-checkout: false
-          filter: "blob:none"
+          # sparse-checkout: false
+          # filter: "blob:none"
       - name: Set up .NET
         uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309 # v5.1.0
         with:
@@ -61,9 +60,9 @@ jobs:
         run: |
           ls
       - name: Restore dependencies
-        run: dotnet restore ${{env.PROJECT_PATH}}
+        run: dotnet restore ${{env.PROJECT_NAME}}
       - name: Build
-        run: dotnet build ${{env.PROJECT_PATH}} --no-restore --configuration Release
+        run: dotnet build ${{env.PROJECT_NAME}} --no-restore --configuration Release
       - name: Run tests
         run: dotnet test --configuration Release --fail-fast --no-restore --no-build --no-progress --coverage --report-trx --results-directory ./TestResults --output detailed
       - name: Upload test results
