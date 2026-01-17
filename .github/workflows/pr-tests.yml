@@ -1,0 +1,112 @@
+name: PR Tests
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["**"]
+  pull_request:
+    types: [reopened, ready_for_review, review_requested]
+    branches: ["**"]
+  workflow_dispatch:
+
+env:
+  TUNIT_GITHUB_REPORTER_STYLE: collapsible
+  PROJECT_NAME: BankApi.Tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} - .NET 10
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    permissions:
+      contents: read #This is required for actions/checkout
+
+    strategy:
+      max-parallel: 2
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
+      fail-fast: false # stop running other jobs if one fails
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: audit
+          disable-telemetry: true
+          disable-sudo-and-containers: true
+      - name: Optimize Git config for CI
+        run: |
+          # Disable compression for faster network transfer.
+          git config --global core.compression 0 
+          # Turn off fsync
+          git config --global core.fsync -all
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+      - name: Set up .NET
+        uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309 # v5.1.0
+        with:
+          global-json-file: global.json # just for explicitness
+      - name: Verify project file exists
+        run: |
+          ls
+      - name: Restore dependencies
+        run: dotnet restore ${{env.PROJECT_NAME}}
+      - name: Build
+        run: dotnet build ${{env.PROJECT_NAME}} --no-restore --configuration Release
+      - name: Run tests
+        run: dotnet test --configuration Release --fail-fast --no-restore --no-build --no-progress --coverage --report-trx --results-directory ./TestResults --output detailed
+      - name: Upload test results
+        if: always() # Run even if tests fail
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: test-results-${{ matrix.os }}
+          path: ./TestResults/*.trx
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: coverage-${{ matrix.os }}
+          path: ./TestResults/*.coverage
+
+  publish-results:
+    name: Publish Test Results
+    needs: test
+    runs-on: [ubuntu-24.04-arm]
+    timeout-minutes: 15
+
+    permissions:
+      # contents: read # Explicit permission for private repos
+      # issues: read # Required for private repos
+      checks: write # Required by EnricoMi/publish-unit-test-result-action
+      pull-requests: write # Required to comment on PRs by EnricoMi/publish-unit-test-result-action
+
+    if: always()
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: audit
+          disable-telemetry: true
+          disable-sudo: true
+      - name: Download all test results
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: test-results-*
+          path: ./TestResults
+
+      - name: Comment PR with results
+        uses: EnricoMi/publish-unit-test-result-action@27d65e188ec43221b20d26de30f4892fad91df2f # v2.22.0
+        with:
+          check_name: "Test Results (${{ github.event.workflow_run.event || github.event_name }})"
+          comment_mode: always
+          files: ./TestResults/**/*.trx
+          action_fail: false
+          action_fail_on_inconclusive: true
