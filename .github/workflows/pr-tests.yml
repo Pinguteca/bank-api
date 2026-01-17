@@ -51,6 +51,7 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: |
+            BankApi.Core/
             BankApi.Tests/
           sparse-checkout-cone-mode: true
           filter: "blob:none"
