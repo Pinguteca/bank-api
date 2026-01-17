@@ -5,6 +5,7 @@ on:
     branches: ["main", "feature/**"]
     tags: ["**"]
   pull_request:
+    types: [reopened, ready_for_review, review_requested]
     branches: ["**"]
   workflow_dispatch:
 
