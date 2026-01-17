@@ -29,7 +29,7 @@ jobs:
       max-parallel: 2
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
-      fail-fast: true # stop running other jobs if one fails
+      fail-fast: false # stop running other jobs if one fails
 
     steps:
       - name: Harden Runner
