@@ -11,7 +11,7 @@ on:
 
 env:
   TUNIT_GITHUB_REPORTER_STYLE: collapsible
-  PROJECT_NAME: BankApi.Service.Stable
+  PROJECT_NAME: BankApi.Tests
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
