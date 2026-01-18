@@ -85,4 +85,4 @@ jobs:
           subject-name: myapp
           subject-digest: sha256:${{ needs.build-and-publish.outputs.app-artifact-digest }}
           show-summary: true
-          push-to-registry: true
+          # push-to-registry: true
