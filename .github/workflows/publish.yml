@@ -1,0 +1,81 @@
+name: Build and Publish
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["**"]
+  pull_request:
+    types: [reopened, ready_for_review, review_requested]
+    branches: ["**"]
+  workflow_dispatch:
+
+env:
+  PROJECT_NAME: BankApi.Service.Stable
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  build-and-publish:
+    strategy:
+      max-parallel: 2
+      matrix:
+        include:
+          - vm: ubuntu-24.04
+            rid: linux-x64
+          - vm: ubuntu-24.04-arm
+            rid: linux-arm64
+          - vm: windows-2025
+            rid: win-x64
+      fail-fast: false # stop running other jobs if one fails
+    name: ${{ matrix.vm}}-${{ matrix.rid }}
+    runs-on: ${{ matrix.vm }}
+    timeout-minutes: 30
+    permissions:
+      contents: read # for actions/checkout
+      id-token: write # for OIDC token
+      attestations: write
+      artifact-metadata: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
+        with:
+          egress-policy: audit
+          disable-telemetry: true
+          disable-sudo-and-containers: true
+      - name: Optimize Git config for CI
+        run: |
+          # Disable compression for faster network transfer.
+          git config --global core.compression 0 
+          # Turn off fsync
+          git config --global core.fsync -all
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
+      - name: Set up .NET
+        id: setup-dotnet
+        uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309 # v5.1.0
+        with:
+          global-json-file: global.json
+      - name: Restore dependencies
+        run: dotnet restore ${{env.PROJECT_NAME}}
+      - name: Build
+        run: dotnet build ${{env.PROJECT_NAME}} --no-restore --configuration Release
+      - name: Publish
+        run: dotnet publish ${{env.PROJECT_NAME}} --no-build --configuration Release -o artifacts/${{ env.PROJECT_NAME }}/net${{ steps.setup-dotnet.outputs.dotnet-version }}/${{ matrix.rid }}
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        id: upload-app
+        with:
+          name: ${{ env.PROJECT_NAME }}-net${{ steps.setup-dotnet.outputs.dotnet-version }}-${{ matrix.rid }}
+          path: artifacts/${{ env.PROJECT_NAME }}/net${{ steps.setup-dotnet.outputs.dotnet-version }}/${{ matrix.rid }}
+          if-no-files-found: error
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-name: ${{ env.PROJECT_NAME }}-net${{ steps.setup-dotnet.outputs.dotnet-version }}-${{ matrix.rid }}
+          subject-digest: sha256:${{ steps.upload-app.outputs.artifact-digest }}
+          show-summary: true
