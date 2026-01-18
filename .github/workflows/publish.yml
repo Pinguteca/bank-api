@@ -26,6 +26,9 @@ jobs:
     permissions:
       contents: read # for actions/checkout
 
+    outputs:
+      app-artifact-digest: ${{ steps.upload-app.outputs.artifact-digest }}
+      
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.14.0
@@ -80,6 +83,6 @@ jobs:
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
           subject-name: myapp
-          subject-digest: sha256:${{ steps.upload-app.outputs.artifact-digest }}
+          subject-digest: sha256:${{ needs.build-and-publish.outputs.app-artifact-digest }}
           show-summary: true
           push-to-registry: true
