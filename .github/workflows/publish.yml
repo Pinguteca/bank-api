@@ -23,11 +23,16 @@ jobs:
     strategy:
       max-parallel: 2
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2025]
-        dotnet-version: ["10.0.x"]
+        include:
+          - vm: ubuntu-24.04
+            rid: linux-x64
+          - vm: ubuntu-24.04-arm
+            rid: linux-arm64
+          - vm: windows-2025
+            rid: win-x64
       fail-fast: false # stop running other jobs if one fails
-    name: ${{ matrix.os}}
-    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.vm}}-${{ matrix.rid }}
+    runs-on: ${{ matrix.vm }}
     timeout-minutes: 30
     permissions:
       contents: read # for actions/checkout
@@ -51,25 +56,26 @@ jobs:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           persist-credentials: false
-      - name: Set up .NET ${{ matrix.dotnet-version }}
+      - name: Set up .NET
+        id: setup-dotnet
         uses: actions/setup-dotnet@baa11fbfe1d6520db94683bd5c7a3818018e4309 # v5.1.0
         with:
-          dotnet-version: ${{ matrix.dotnet-version }}
+          global-json-file: global.json
       - name: Restore dependencies
         run: dotnet restore ${{env.PROJECT_NAME}}
       - name: Build
         run: dotnet build ${{env.PROJECT_NAME}} --no-restore --configuration Release
       - name: Publish
-        run: dotnet publish ${{env.PROJECT_NAME}} --no-build --configuration Release -o artifacts/${{ env.PROJECT_NAME }}/${{ matrix.dotnet-version }}/${{ matrix.os }}
+        run: dotnet publish ${{env.PROJECT_NAME}} --no-build --configuration Release -o artifacts/${{ env.PROJECT_NAME }}/net${{ steps.setup-dotnet.outputs.dotnet-version }}/${{ matrix.rid }}
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         id: upload-app
         with:
-          name: ${{ env.PROJECT_NAME }}-${{ matrix.dotnet-version }}-${{ matrix.os }}
-          path: artifacts/${{ env.PROJECT_NAME }}/${{ matrix.dotnet-version }}/${{ matrix.os }}
+          name: ${{ env.PROJECT_NAME }}-net${{ steps.setup-dotnet.outputs.dotnet-version }}-${{ matrix.rid }}
+          path: artifacts/${{ env.PROJECT_NAME }}/net${{ steps.setup-dotnet.outputs.dotnet-version }}/${{ matrix.rid }}
           if-no-files-found: error
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
-          subject-name: ${{ env.PROJECT_NAME }}-${{ matrix.dotnet-version }}-${{ matrix.os }}
+          subject-name: ${{ env.PROJECT_NAME }}-net${{ steps.setup-dotnet.outputs.dotnet-version }}-${{ matrix.rid }}
           subject-digest: sha256:${{ steps.upload-app.outputs.artifact-digest }}
           show-summary: true
