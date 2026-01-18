@@ -54,12 +54,12 @@ jobs:
       - name: Build
         run: dotnet build ${{env.PROJECT_NAME}} --no-restore --configuration Release
       - name: Publish
-        run: dotnet publish ${{env.PROJECT_NAME}} --no-build --configuration Release -o artifacts/myapp
+        run: dotnet publish ${{env.PROJECT_NAME}} --no-build --configuration Release -o artifacts/${{env.PROJECT_NAME}}
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         id: upload-app
         with:
-          name: myapp
-          path: artifacts/myapp
+          name: ${{env.PROJECT_NAME}}
+          path: artifacts/${{env.PROJECT_NAME}}
           if-no-files-found: error
 
   generate-attestations:
@@ -82,7 +82,6 @@ jobs:
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
-          subject-name: myapp
+          subject-name: ${{env.PROJECT_NAME}}
           subject-digest: sha256:${{ needs.build-and-publish.outputs.app-artifact-digest }}
           show-summary: true
-          # push-to-registry: true
